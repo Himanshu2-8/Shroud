@@ -1,42 +1,43 @@
-import { redis } from '@/lib/redis'
+import { NextResponse } from "next/server";
+import { redis } from '@/lib/redis';
 import { nanoid } from "nanoid";
-
-export interface Room {
-  id: string;
-  createdAt: number;
-  expiresAt: number;
-  userCount: number;
-}
+import { Room,CreateRoomResponse,ErrorResponse } from "@/types/room";
 
 export async function POST() {
-  const id = nanoid(6);
+  const roomId = nanoid(6);
+  
   try {
     const now = Date.now();
     const expiresAt = now + (10 * 60 * 1000);
 
     const roomMeta: Room = {
-      id: id,
+      id: roomId,
       createdAt: now,
       expiresAt: expiresAt,
       userCount: 0
     };
 
     await redis.setex(
-      `room:${id}:meta`,
+      `room:${roomId}:meta`,
       600,
       JSON.stringify(roomMeta)
     );
 
-    return new Response(JSON.stringify({ msg: "Room created successfully", id: id }), {
-      status: 201
-    })
-  } catch (e) {
-    if (e instanceof Error) {
-      return new Response(JSON.stringify(e));
-    }
-    else {
-      return new Response(JSON.stringify({ msg: "Failed to create Room" }));
-    }
-  }
+    const response: CreateRoomResponse = {
+      roomId,
+      expiresAt,
+      expiresIn: 600
+    };
 
+    return NextResponse.json(response, { status: 201 });
+    
+  } catch (e) {
+    console.error('Failed to create room:', e);
+    
+    const error: ErrorResponse = {
+      error: e instanceof Error ? e.message : 'Failed to create room'
+    };
+    
+    return NextResponse.json(error, { status: 500 });
+  }
 }
